@@ -1,11 +1,12 @@
-from imdb import IMDb
 import json
 import numpy as np
 from SPARQLWrapper import SPARQLWrapper, JSON
 import wikipedia
-import requests
-import nltk
-from bs4 import BeautifulSoup
+
+
+yearsArray = ["19391969", "19691989","19892001", "20012007","20072011", "20112014","20142017", "20172019"]
+careers_and_occupations = []
+
 
 def get_results(endpoint_url, query):
     sparql = SPARQLWrapper(endpoint_url)
@@ -14,8 +15,6 @@ def get_results(endpoint_url, query):
     return sparql.query().convert()
 
 
-careers_and_occupations = []
-charactersPerJob = {}
 def create_occupations_array():
     endpoint_url = "https://query.wikidata.org/sparql"
 
@@ -23,7 +22,7 @@ def create_occupations_array():
       ?occ wdt:P31 wd:Q28640.
           SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
     }
-    
+
     """
     results = get_results(endpoint_url, query)
 
@@ -32,26 +31,16 @@ def create_occupations_array():
     careers_and_occupations.extend(["FBI Agent", "Agent","squad leader", ""])
     careers_and_occupations.sort()
     careers_and_occupations.sort(reverse=True, key=len)
-    # charactersPerJobArr = {careers_and_occupations[i]:{'job':careers_and_occupations[i],'allActors': 0, 'actresses': 0, 'actors': 0} for i in range(len(careers_and_occupations))}
-    # for job in charactersPerJobArr:
-    #     print(job)
 
-# ia = IMDb()
 
-# -------------------------------- getting plot and find sentences containing a certain name------
 def get_sentences_in_plot_contain_character(character_name, plot):
     arr = []
-
     stop_words = [character_name]
-    # if ("'s " not in character_name) and ():
-    #     stop_words = stop_words + character_name.split(' ')
-    # print("characters optional names: ",stop_words)
     if plot:
-        arr = [sent.lower().split(' ') for sent in plot.split('.') if any(word in sent for word in stop_words)]
-        # print ("sentences array: ", arr)
-        # arr = arr.split(' ')
+        # added replace(',','') on 4.8 while realized that a comma can be right after occupation
+        arr = [sent.lower().replace(',','').split(' ') for sent in plot.split('.') if any(word in sent for word in stop_words)]
     return arr
-#  -------------------------------------- get character occupation in plot
+
 
 def is_a_in_x(A, X):
     # print("len(x) = ", len(X))
@@ -64,7 +53,6 @@ def is_a_in_x(A, X):
 
 def get_character_occupation(sentence):
     # print("len(sentence): ", len(sentence))
-
     for job in careers_and_occupations:
         tmp = job
         tmp = tmp.split(' ')
@@ -119,7 +107,7 @@ def get_plot(film_name):
     return plot
 
 
-def get_movie_actors_and_occupations(film_name, movie, black_actors):
+def get_movie_actors_and_occupations(charactersPerJob, film_name, movie, black_actors):
     actors_with_occ = []
     print("for Movie: " + film_name)
     # actors = get_cast(movie['African American Actors'])
@@ -135,7 +123,7 @@ def get_movie_actors_and_occupations(film_name, movie, black_actors):
                 print({'actor name': actor["name"], 'character name': actor["role"], 'occupation': occupation})
                 actors_with_occ.extend([{'actor name': actor["name"], 'character name': actor["role"], 'occupation': occupation}])
                 actor['occupation'] = occupation
-                if (occupation in charactersPerJob):
+                if occupation in charactersPerJob:
                     charactersPerJob[occupation]['numOfCharacters'] += 1
                     charactersPerJob[occupation]['characters'].extend([{'movie name':film_name,'actor name': actor["name"], 'character name': actor["role"]}])
                 else:
@@ -146,59 +134,99 @@ def get_movie_actors_and_occupations(film_name, movie, black_actors):
     return actors_with_occ
 
 
-create_occupations_array()
-print(careers_and_occupations)
-yearsArray = ["19391969", "19691989","19892001", "20012007","20072011", "20112014","20142017", "20172019"]
-moviesArrays={}
-
-
 def read_jsons_to_arrays():
+    moviesArrays = {}
     for years in yearsArray:
         path = './MoviesDataWithBlackActors/moviesWith' + years + 'BlackActors.json'
         with open(path) as json_file:
             moviesArrays[years] = json.load(json_file)
+    return moviesArrays
 
-    movies_res = []
+
+def create_occupations_by_job_and_by_movies_jsons():
+    create_occupations_array()
+    print(careers_and_occupations)
+    movies_arrays = read_jsons_to_arrays()
+    for years in movies_arrays:
+        i = 0
+        charactersPerJob = {}
+        occupationsByMovieToJson = {}
+        for movie in movies_arrays[years]:
+            i += 1
+            print("i is: ", i)
+            film_name = movie['title']
+            black_actors = movie['BlackActors']
+            actors_with_occ = get_movie_actors_and_occupations(charactersPerJob, film_name, movie, black_actors)
+            if actors_with_occ:
+                occupationsByMovieToJson.update({film_name: {'actorsWithOcc': actors_with_occ}})
+        open("./occupationsByJob" + years + ".json", "w").write(json.dumps(charactersPerJob, indent=4))
+        open("./occupationsByMovie" + years + ".json", "w").write(json.dumps(occupationsByMovieToJson, indent=4))
+
+
+def create_same_dict_with_title(d, by_what, toUpdate):
+    d['title'] = by_what
+    d.update(toUpdate)
+    return dict
+
+
+def add_or_update_merged_jobs_dict( merged_jobs, job,file):
+            if file[job] in merged_jobs:
+                merged_jobs[job]['numOfCharacters'] += file[job]['numOfCharacters']
+                merged_jobs[job]['characters'].extend(file[job]['characters'])
+            else:
+                create_same_dict_with_title(merged_jobs[job], job, file[job])
+
+
+def refile(by_what, f, new_file):
+    path = "./occupationsBy" + by_what + f + "New.json"
+    open(path, "w").write(json.dumps(new_file, indent=4))
+
+
+def save_merged(by_what,occupations_by):
+    path = "./occupationsBy"+by_what+"Merged.json"
+    open(path, "w").write(json.dumps(occupations_by, indent=4))
+
+
+def read_files(by_what):
+    files = {}
     for years in yearsArray:
-        path = './MoviesDataWithBlackActors/moviesWith'+years+'BlackActors.json'
+        path = "./occupationsBy" + by_what + years + ".json"
         with open(path) as json_file:
-            movies_res.extend(json.load(json_file))
-    # print ("num of movies is: ",len(movies))
-    return movies_res
+            files[years] = json.load(json_file)
+    return files
 
 
-movies = read_jsons_to_arrays()
-i = 0
-
-for years in moviesArrays:
-    occupationsByMovieToJson = {}
-    occupationsByJobToJson = []
-    for movie in moviesArrays[years]:
-        i += 1
-        print("i is: ", i)
-        film_name = movie['title']
-        # actors = movie["Actors"]
-        black_actors = movie['BlackActors']
-        actors_with_occ = get_movie_actors_and_occupations(film_name,movie,black_actors)
-        if actors_with_occ:
-            occupationsByMovieToJson.update({film_name: {'actorsWithOcc': actors_with_occ}})
-    occupationsByJobToJson = charactersPerJob
-    open("./occupationsByJob"+years+".json", "w").write(json.dumps(occupationsByJobToJson, indent=4))
-    open("./occupationsByMovie"+years+".json", "w").write(json.dumps(occupationsByMovieToJson, indent=4))
-
-    open("./occupationsByJob.json", "a").write(json.dumps(occupationsByJobToJson, indent=4))
-    open("./occupationsByMovie.json", "a").write(json.dumps(occupationsByMovieToJson, indent=4))
+def create_legal_jobs_jsons():
+    job_files = read_files("Job")
+    mergedJobs = {}
+    for f in job_files:
+        new_file = []
+        file = job_files[f]
+        for job in file:
+            add_or_update_merged_jobs_dict( mergedJobs, job,file)
+            new_file.extend([create_same_dict_with_title({},job,file[job])])
+        refile("Job", f,new_file)
+    occupations_by_job = []
+    for job in mergedJobs:
+        occupations_by_job.extend(mergedJobs[job])
+    save_merged("Jobs",occupations_by_job)
 
 
+def create_legal_movies_jsons():
+    movies_files = read_files("Movie")
+    occupations_by_movie = []
+    for f in movies_files:
+        new_file = []
+        file = movies_files[f]
+        for movie in file:
+            dict_movie = create_same_dict_with_title({},movie, file[movie])
+            occupations_by_movie.extend([dict_movie])
+            new_file.extend([dict_movie])
+        refile("Movie", f,new_file)
+
+    save_merged("Movies",occupations_by_movie)
 
 
-
-# get_movie_actors_and_occupations(film_name,movie,black_actors)
-# if film_name != "The Polka King":
-# if film_name != "Fist Fight":
-# if film_name != "Jamesy Boy": #star/t
-# actor: Tituss Burgess, played as: John The Physical Therapist ,for Movie: Catfight
-#     continue
-# if film_name != "The Shawshank Redemption": #star/t
-#     continue
-# The Shawshank Redemption 1994
+# create_occupations_by_job_and_by_movies_jsons()
+create_legal_jobs_jsons()
+create_legal_movies_jsons()
