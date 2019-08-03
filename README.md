@@ -18,6 +18,7 @@ Creating data bases:
 		3. Creating data base based on imported data for each person that we found over the 80 years.
 
 Filtering data:
+
 	Filtered Data:
 	
 		All African-American actors/directors/producers dataBase - getBlackPeopleNew.py
