@@ -123,10 +123,11 @@ def get_movie_actors_and_occupations(charactersPerJob, film_name, movie, black_a
                 print({'actor name': actor["name"], 'character name': actor["role"], 'occupation': occupation})
                 actors_with_occ.extend([{'actor name': actor["name"], 'character name': actor["role"], 'occupation': occupation}])
                 actor['occupation'] = occupation
-                if occupation in charactersPerJob:
+                if occupation in charactersPerJob.keys():
                     charactersPerJob[occupation]['numOfCharacters'] += 1
                     charactersPerJob[occupation]['characters'].extend([{'movie name':film_name,'actor name': actor["name"], 'character name': actor["role"]}])
                 else:
+                    print("this is occupation:", occupation)
                     d = {occupation: {'numOfCharacters': 1,'characters': [{'movie name':film_name,'actor name': actor["name"], 'character name': actor["role"]}] }}
                     charactersPerJob.update(d)
     if actors_with_occ:
@@ -159,38 +160,40 @@ def create_occupations_by_job_and_by_movies_jsons():
             actors_with_occ = get_movie_actors_and_occupations(charactersPerJob, film_name, movie, black_actors)
             if actors_with_occ:
                 occupationsByMovieToJson.update({film_name: {'actorsWithOcc': actors_with_occ}})
-        open("./occupationsByJob" + years + ".json", "w").write(json.dumps(charactersPerJob, indent=4))
-        open("./occupationsByMovie" + years + ".json", "w").write(json.dumps(occupationsByMovieToJson, indent=4))
+        open("./occupations_dicts/occupationsByJob" + years + ".json", "w").write(json.dumps(charactersPerJob, indent=4))
+        open("./occupations_dicts/occupationsByMovie" + years + ".json", "w").write(json.dumps(occupationsByMovieToJson, indent=4))
 
 
-def create_same_dict_with_title(d, by_what, toUpdate):
+def create_same_dict_with_title(d, by_what, to_update):
     d['title'] = by_what
-    d.update(toUpdate)
-    return dict
+    d.update(to_update)
+    return d
 
 
-def add_or_update_merged_jobs_dict( merged_jobs, job,file):
-            if file[job] in merged_jobs:
-                merged_jobs[job]['numOfCharacters'] += file[job]['numOfCharacters']
-                merged_jobs[job]['characters'].extend(file[job]['characters'])
-            else:
-                create_same_dict_with_title(merged_jobs[job], job, file[job])
-
+def add_or_update_merged_jobs_dict(merged_jobs, job, file):
+    if job in merged_jobs.keys():
+        merged_jobs[job]['numOfCharacters'] += file[job]['numOfCharacters']
+        merged_jobs[job]['characters'].extend(file[job]['characters'])
+    else:
+        # create_same_dict_with_title(merged_jobs[job], job, file[job])
+        merged_jobs[job]={}
+        merged_jobs[job]['title'] = job
+        merged_jobs[job].update(file[job])
 
 def refile(by_what, f, new_file):
-    path = "./occupationsBy" + by_what + f + "New.json"
+    path = "./occupations_new/occupationsBy" + by_what + f + "New.json"
     open(path, "w").write(json.dumps(new_file, indent=4))
 
 
 def save_merged(by_what,occupations_by):
-    path = "./occupationsBy"+by_what+"Merged.json"
+    path = "./occupations_new/occupationsBy"+by_what+"Merged.json"
     open(path, "w").write(json.dumps(occupations_by, indent=4))
 
 
 def read_files(by_what):
     files = {}
     for years in yearsArray:
-        path = "./occupationsBy" + by_what + years + ".json"
+        path = "./occupations_dicts/occupationsBy" + by_what + years + ".json"
         with open(path) as json_file:
             files[years] = json.load(json_file)
     return files
@@ -198,17 +201,17 @@ def read_files(by_what):
 
 def create_legal_jobs_jsons():
     job_files = read_files("Job")
-    mergedJobs = {}
+    mergedjobs = {}
     for f in job_files:
         new_file = []
-        file = job_files[f]
-        for job in file:
-            add_or_update_merged_jobs_dict( mergedJobs, job,file)
-            new_file.extend([create_same_dict_with_title({},job,file[job])])
-        refile("Job", f,new_file)
+        for job in job_files[f]:
+            add_or_update_merged_jobs_dict(mergedjobs, job, job_files[f])
+            new_file.extend([create_same_dict_with_title({},job, job_files[f][job])])
+            refile("Job", f,new_file)
     occupations_by_job = []
-    for job in mergedJobs:
-        occupations_by_job.extend(mergedJobs[job])
+    # print (mergedjobs)
+    for job in mergedjobs.values():
+        occupations_by_job.extend([job])
     save_merged("Jobs",occupations_by_job)
 
 
@@ -227,6 +230,6 @@ def create_legal_movies_jsons():
     save_merged("Movies",occupations_by_movie)
 
 
-# create_occupations_by_job_and_by_movies_jsons()
+create_occupations_by_job_and_by_movies_jsons()
 create_legal_jobs_jsons()
 create_legal_movies_jsons()
