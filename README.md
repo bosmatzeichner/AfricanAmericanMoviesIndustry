@@ -48,16 +48,13 @@ Processing data:
 	
 	PEOPLE:
 	
-		For each person in how many movies he took place.
 		
 		How many of the people in the filtered data are male/female.
 		
 		Creating a map of place of birth areas.
 		
-		Average age.
+		popularity - for each person find out in how many movies he took place.
 		
-		popularity - for each person find out in how many movies they played 
-		
-		map the places of birth 
+		map the places of birth.
         
 
