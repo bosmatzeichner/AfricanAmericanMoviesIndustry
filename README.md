@@ -1,5 +1,7 @@
 # AfricanAmericanMoviesIndustry
 
+Link to official website: https://yael9949.wixsite.com/afroamericanmovies
+
 Link to Project directory: http://www.mediafire.com/folder/r120mdzwn9wt3/AfricanAmericanMoviesIndustry
 
 Creating data bases:
